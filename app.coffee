@@ -1,6 +1,11 @@
 request = require 'request-promise'
+tesseract = require 'node-tesseract'
+tmpdir = require('os').tmpdir()
 express = require 'express'
 ImageJS = require 'imagejs'
+uuid = require 'node-uuid'
+path = require 'path'
+fs = require 'fs'
 gm = require 'gm'
 app = express()
 
@@ -50,7 +55,17 @@ app.get '/', (req, res) ->
             if black_point < 30
               bitmap.setPixel x, y, {r: 255, g: 255, b: 255}
 
-      bitmap.write res, type: ImageJS.ImageType.JPG
+      filepath = path.resolve(tmpdir, 'captchas-' + uuid.v4())
+
+      bitmap.writeFile filepath, type: ImageJS.ImageType.JPG
+      .then ->
+        tesseract.process filepath, (err, text) ->
+          res.header 'code', text
+          
+          fs.readFile filepath, (err, buffer) ->
+            fs.unlink filepath, ->
+            res.send buffer
+
   .catch (err) ->
     console.error err.stack
     res.sendStatus 500
