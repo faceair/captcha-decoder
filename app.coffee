@@ -59,9 +59,12 @@ app.get '/', (req, res) ->
 
       bitmap.writeFile filepath, type: ImageJS.ImageType.JPG
       .then ->
-        tesseract.process filepath, (err, text) ->
+        tesseract.process filepath,
+          l: 'eng'
+          psm: 7
+        , (err, text) ->
           res.header 'code', text
-          
+
           fs.readFile filepath, (err, buffer) ->
             fs.unlink filepath, ->
             res.send buffer
