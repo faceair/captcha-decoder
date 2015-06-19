@@ -20,6 +20,7 @@ app.get '/', (req, res) ->
     res.header 'Content-Type', response.headers['content-type']
 
     stream = gm(response.body)
+    .rotate('white', -13)
     .resize(420, 132, '!')
     .colorspace('GRAY')
     .blackThreshold(90, 130, 0)
