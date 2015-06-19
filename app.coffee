@@ -1,6 +1,5 @@
 request = require 'request-promise'
 express = require 'express'
-Jpeg = require 'jpeg-js'
 ImageJS = require 'imagejs'
 gm = require 'gm'
 app = express()
@@ -33,9 +32,7 @@ app.get '/', (req, res) ->
           else
             bitmap.setPixel x, y, {r: 0, g: 0, b: 0}
 
-      buffer = Jpeg.encode(bitmap._data, 90).data
-      res.send buffer
-
+      bitmap.write res, type: ImageJS.ImageType.JPG
   .catch (err) ->
     console.error err.stack
     res.sendStatus 500

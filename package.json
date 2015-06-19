@@ -6,8 +6,7 @@
   "dependencies": {
     "express": "^4.12.4",
     "gm": "^1.18.1",
-    "imagejs": "0.0.9",
-    "jpeg-js": "^0.1.1",
+    "imagejs": "^0.0.9",
     "request-promise": "^0.4.2"
   },
   "devDependencies": {},
