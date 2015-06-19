@@ -24,13 +24,31 @@ app.get '/', (req, res) ->
     bitmap = new ImageJS.Bitmap()
     bitmap.read stream, type: ImageJS.ImageType.JPG
     .then ->
-      for x in [0...420]
-        for y in [0...132]
+      for y in [0...132]
+        for x in [0...420]
           {r, g, b} = bitmap.getPixel x, y
           if r > 90 and g > 130
             bitmap.setPixel x, y, {r: 255, g: 255, b: 255}
           else
             bitmap.setPixel x, y, {r: 0, g: 0, b: 0}
+
+      near_point = []
+      for i in [-5...5]
+        for j in [-5...5]
+          near_point.push [i, j]
+
+      for y in [0...132]
+        for x in [0...420]
+          {r, g, b} = bitmap.getPixel x, y
+          if r < 10
+            black_point = 0
+            for [a, b] in near_point
+              if x + a >= 0 and x + a <= 419 and y + b >= 0 and y + b <= 132
+                if bitmap.getPixel(x + a, y + b).r < 10
+                  black_point += 1
+
+            if black_point < 30
+              bitmap.setPixel x, y, {r: 255, g: 255, b: 255}
 
       bitmap.write res, type: ImageJS.ImageType.JPG
   .catch (err) ->
