@@ -5,6 +5,7 @@ express = require 'express'
 ImageJS = require 'imagejs'
 uuid = require 'node-uuid'
 path = require 'path'
+_ = require 'lodash'
 fs = require 'fs'
 gm = require 'gm'
 app = express()
@@ -30,6 +31,7 @@ app.get '/', (req, res) ->
     bitmap = new ImageJS.Bitmap()
     bitmap.read stream, type: ImageJS.ImageType.JPG
     .then ->
+      # 二值化
       for y in [0...132]
         for x in [0...420]
           {r, g, b} = bitmap.getPixel x, y
@@ -38,6 +40,7 @@ app.get '/', (req, res) ->
           else
             bitmap.setPixel x, y, {r: 0, g: 0, b: 0}
 
+      # 去污点
       near_point = []
       for i in [-5...5]
         for j in [-5...5]
@@ -55,6 +58,96 @@ app.get '/', (req, res) ->
 
             if black_point < 30
               bitmap.setPixel x, y, {r: 255, g: 255, b: 255}
+
+      # X轴上像素分布
+      x_line_obj = {}
+      x_line_obj[x] = 0 for x in [0...420]
+
+      for y in [0...132]
+        for x in [0...420]
+          {r, g, b} = bitmap.getPixel x, y
+          if r is 0 and g is 0 and b is 0
+            x_line_obj[x] += 1
+
+      x_line = _.values x_line_obj
+
+      divide_x = []
+
+      start = 0
+      for points, index in x_line
+        start = index
+        break if points isnt 0
+
+      end = 419
+      for points, index in x_line.reverse()
+        end = x_line.length - index
+        break if points isnt 0
+      x_line.reverse()
+
+      render_x_obj = {}
+
+      divide_x_arr = _.filter [start...end], (index) ->
+        return _.every [1...40], (near_index) ->
+          not_out_start = (index - near_index) > start
+          not_out_end = (index + near_index) < end
+
+          less_after = x_line[index] <= x_line[index + near_index]
+          less_before = x_line[index] <= x_line[index - near_index]
+
+          return not_out_start and not_out_end and less_after and less_before
+
+      divide_x_arr = divide_x_arr.sort((a, b) -> a - b)
+
+      divide_x_arr_clean = []
+
+      for index in [0...divide_x_arr.length]
+        unless divide_x_arr[index]
+          continue
+        divide_x = divide_x_arr[index]
+        for near_index in [1...(divide_x_arr.length - index)]
+          unless near_index is (divide_x_arr[index + near_index] - divide_x)
+            break
+        divide_x_arr_clean.push Math.floor((divide_x_arr[index] + divide_x_arr[index + near_index - 1]) / 2)
+        for i in [0...near_index]
+          divide_x_arr[index + i] = undefined
+
+      if divide_x_arr_clean.length isnt 3
+        divide_x_arr_clean_obj = divide_x_arr_clean.map (index) ->
+          return {
+            index: index
+            points: x_line[index]
+          }
+        divide_x_arr_clean = _.pluck _.slice(_.sortBy(divide_x_arr_clean_obj, 'points'), 0, 3), 'index'
+
+      divide_x_arr_clean = _.union([start, end], divide_x_arr_clean).sort((a, b) -> a - b)
+
+      divide = []
+      square = [
+        [divide_x_arr_clean[0], divide_x_arr_clean[1]]
+        [divide_x_arr_clean[1], divide_x_arr_clean[2]]
+        [divide_x_arr_clean[2], divide_x_arr_clean[3]]
+        [divide_x_arr_clean[3], divide_x_arr_clean[4]]
+      ]
+
+      for [divide_x_a, divide_x_b] in square
+        divide_y = []
+        for x in [divide_x_a...divide_x_b + 1]
+          for y in [0...132]
+            {r, g, b} = bitmap.getPixel x, y
+            if r is 0 and g is 0 and b is 0
+              divide_y.push y
+
+        min_y = _.min divide_y
+        max_y = _.max divide_y
+
+        divide.push [divide_x_a, divide_x_b, min_y, max_y]
+
+      divide_image = divide.map ([divide_x_a, divide_x_b, divide_y_a, divide_y_b]) ->
+        return bitmap.crop
+          top: divide_y_a
+          left: divide_x_a
+          width: divide_x_b - divide_x_a
+          height: divide_y_b - divide_y_a
 
       filepath = path.resolve(tmpdir, 'captchas-' + uuid.v4())
 
