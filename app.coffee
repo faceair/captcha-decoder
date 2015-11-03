@@ -1,8 +1,10 @@
 request = require 'request-promise'
+Promise = require 'bluebird'
 tesseract = require 'node-tesseract'
 tmpdir = require('os').tmpdir()
 express = require 'express'
 ImageJS = require 'imagejs'
+jpeg = require 'jpeg-js'
 uuid = require 'node-uuid'
 path = require 'path'
 _ = require 'lodash'
@@ -149,19 +151,20 @@ app.get '/', (req, res) ->
           width: divide_x_b - divide_x_a
           height: divide_y_b - divide_y_a
 
-      filepath = path.resolve(tmpdir, 'captchas-' + uuid.v4())
-
-      bitmap.writeFile filepath, type: ImageJS.ImageType.JPG
-      .then ->
-        tesseract.process filepath,
-          l: 'eng'
-          psm: 7
-        , (err, text) ->
-          res.header 'code', text
-
-          fs.readFile filepath, (err, buffer) ->
-            fs.unlink filepath, ->
-            res.send buffer
+      Promise.map divide_image, (char_bitmap) ->
+        filepath = path.resolve(tmpdir, 'captchas-' + uuid.v4())
+        char_bitmap.writeFile filepath, type: ImageJS.ImageType.JPG
+        .then ->
+          Promise.promisify(tesseract.process) filepath,
+            l: 'eng'
+            psm: 10
+            config: 'nobatch captcha'
+        .then (char) ->
+          fs.unlink filepath, ->
+          return char.replace /\W+/g, ''
+      .then (chars) ->
+        res.header 'Captcha', chars.join ''
+        res.send jpeg.encode(bitmap._data, 90).data
 
   .catch (err) ->
     console.error err.stack
