@@ -152,7 +152,7 @@ app.get '/', (req, res) ->
           height: divide_y_b - divide_y_a
 
       Promise.map divide_image, (char_bitmap) ->
-        filepath = path.resolve(tmpdir, 'captchas-' + uuid.v4())
+        filepath = "./captchas/captchas-#{uuid.v4()}.jpeg"
         char_bitmap.writeFile filepath, type: ImageJS.ImageType.JPG
         .then ->
           Promise.promisify(tesseract.process) filepath,
@@ -160,11 +160,18 @@ app.get '/', (req, res) ->
             psm: 10
             config: 'nobatch captcha'
         .then (char) ->
-          fs.unlink filepath, ->
-          return char.replace /\W+/g, ''
+          char = char.replace /\W+/g, ''
+          save = (char, number = 0) ->
+            try
+              fs.accessSync "./captchas/#{char}-#{number}.jpeg", fs.R_OK
+              save char, number + 1
+            catch e
+              fs.renameSync filepath, "./captchas/#{char}-#{number}.jpeg"
+          save char
+          return char
       .then (chars) ->
         res.header 'Captcha', chars.join ''
-        res.send jpeg.encode(bitmap._data, 90).data
+        res.send jpeg.encode(bitmap._data, 100).data
 
   .catch (err) ->
     console.error err.stack
