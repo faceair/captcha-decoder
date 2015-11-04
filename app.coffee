@@ -19,9 +19,6 @@ app.get '/', (req, res) ->
     encoding: null
     resolveWithFullResponse: true
   .then (response) ->
-    res.header 'Set-Cookie', response.headers['set-cookie']
-    res.header 'Content-Type', response.headers['content-type']
-
     stream = gm(response.body)
     .rotate('white', -13)
     .resize(420, 132, '!')
@@ -153,7 +150,11 @@ app.get '/', (req, res) ->
 
       Promise.map divide_image, (char_bitmap) ->
         filepath = "./captchas/captchas-#{uuid.v4()}.jpeg"
-        char_bitmap.writeFile filepath, type: ImageJS.ImageType.JPG
+        char_bitmap.resize
+          width: 120
+          height: 120
+          algorithm: 'nearestNeighbor'
+        .writeFile filepath, type: ImageJS.ImageType.JPG
         .then ->
           Promise.promisify(tesseract.process) filepath,
             l: 'eng'
@@ -170,8 +171,9 @@ app.get '/', (req, res) ->
           save char
           return char
       .then (chars) ->
-        res.header 'Captcha', chars.join ''
-        res.send jpeg.encode(bitmap._data, 100).data
+        res.json
+          session: response.headers['set-cookie']
+          captchas: chars.join ''
 
   .catch (err) ->
     console.error err.stack
